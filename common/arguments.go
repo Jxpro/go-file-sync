@@ -24,15 +24,15 @@ const (
 )
 
 var (
-	once sync.Once
-	args *Arguments
+	once     sync.Once
+	instance *Arguments
 )
 
 func GetArgs() *Arguments {
 	// 单例模式，只解析一次命令行参数和配置文件
 	// 不使用init函数是因为在测试中存在错误
 	once.Do(func() {
-		args = &Arguments{
+		instance = &Arguments{
 			Dir:  "./data",
 			Key:  "goFileSync12138",
 			Mode: "server",
@@ -43,13 +43,13 @@ func GetArgs() *Arguments {
 		fileArgs := parseFile(commandArgs.Config)
 
 		// 合并参数，命令行参数优先级高于配置文件
-		args.mergeArgs(&fileArgs)
-		args.mergeArgs(&commandArgs)
+		instance.mergeArgs(&fileArgs)
+		instance.mergeArgs(&commandArgs)
 
 		// 打印参数
-		args.printArgs()
+		instance.printArgs()
 	})
-	return args
+	return instance
 }
 
 func parseCommand() (commandArgs Arguments) {
@@ -92,6 +92,7 @@ func parseFile(path string) (fileArgs Arguments) {
 	if path == "" {
 		return
 	}
+
 	// 读取配置文件
 	file, err := os.Open(path)
 	if err != nil {
