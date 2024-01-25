@@ -9,16 +9,16 @@ import (
 )
 
 func main() {
-	args := common.ParseArgs()
-	switch args["mode"] {
-	case "client":
+	args := common.GetArgs()
+	switch args.Mode {
+	case common.ClientMode:
 		fmt.Println("Starting client...")
 		client.Start()
-	case "server":
+	case common.ServerMode:
 		fmt.Println("Starting server...")
 		server.Start()
 	default:
-		fmt.Println("Invalid mode: " + args["mode"])
+		fmt.Println("Invalid mode: " + args.Mode)
 		flag.Usage()
 	}
 }

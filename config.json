@@ -1,0 +1,6 @@
+{
+  "dir": "./data",
+  "key": "key",
+  "mode": "client",
+  "addr": "0.0.0.0:6880"
+}
