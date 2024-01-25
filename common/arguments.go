@@ -15,7 +15,7 @@ type Arguments struct {
 	Key    string `json:"key"`
 	Mode   string `json:"mode"`
 	Addr   string `json:"addr"`
-	Config string `json:"args"`
+	Config string `json:"-"` // 不解析配置文件中的config字段
 }
 
 const (
@@ -33,26 +33,24 @@ func GetArgs() *Arguments {
 	// 不使用init函数是因为在测试中存在错误
 	once.Do(func() {
 		instance = &Arguments{
+			// 默认参数
 			Dir:  "./data",
 			Key:  "goFileSync12138",
 			Mode: "server",
 			Addr: "127.0.0.1:6880",
 		}
-		// 解析命令行参数和配置文件
-		commandArgs := parseCommand()
-		fileArgs := parseFile(commandArgs.Config)
-
-		// 合并参数，命令行参数优先级高于配置文件
-		instance.mergeArgs(&fileArgs)
-		instance.mergeArgs(&commandArgs)
-
+		// 解析参数
+		instance.parseArgs()
 		// 打印参数
 		instance.printArgs()
 	})
 	return instance
 }
 
-func parseCommand() (commandArgs Arguments) {
+func (args *Arguments) parseArgs() {
+	// 声明命令行参数
+	var commandArgs Arguments
+
 	// 绑定命令行参数
 	flag.StringVar(&commandArgs.Dir, "d", commandArgs.Dir, "directory to sync")
 	flag.StringVar(&commandArgs.Dir, "dir", commandArgs.Dir, "directory to sync")
@@ -67,8 +65,8 @@ func parseCommand() (commandArgs Arguments) {
 	flag.StringVar(&commandArgs.Addr, "addr", commandArgs.Addr, "connect or listen address")
 
 	// 配置文件的优先级低于命令行参数
-	flag.StringVar(&commandArgs.Config, "c", "", "args file path")
-	flag.StringVar(&commandArgs.Config, "args", "", "args file path")
+	flag.StringVar(&commandArgs.Config, "c", "", "config file path")
+	flag.StringVar(&commandArgs.Config, "config", "", "config file path")
 
 	// 自定义帮助信息
 	flag.Usage = func() {
@@ -78,23 +76,29 @@ func parseCommand() (commandArgs Arguments) {
 		fmt.Println("  -k, --key      authentication key, default: goFileSync12138")
 		fmt.Println("  -m, --mode     start mode: server or client, default: server")
 		fmt.Println("  -a, --addr     address to connect or listen, default:127.0.0.1:6880")
-		fmt.Println("  -c, --args   args file path, priority less than command line parameters")
+		fmt.Println("  -c, --config   config file path, priority less than command line parameters")
 		fmt.Println("  -h, --help     show this help message")
 	}
 
 	// 解析命令行参数
 	flag.Parse()
-	return
+
+	// 解析配置文件
+	fileArgs := commandArgs.parseFile()
+
+	// 合并参数，命令行参数优先级高于配置文件
+	args.mergeArgs(&fileArgs)
+	args.mergeArgs(&commandArgs)
 }
 
-func parseFile(path string) (fileArgs Arguments) {
+func (args *Arguments) parseFile() (fileArgs Arguments) {
 	// 如果配置文件路径为空，则不解析
-	if path == "" {
+	if args.Config == "" {
 		return
 	}
 
 	// 读取配置文件
-	file, err := os.Open(path)
+	file, err := os.Open(args.Config)
 	if err != nil {
 		fmt.Println("------ Error ------\n" + err.Error())
 		os.Exit(1)
@@ -111,30 +115,29 @@ func parseFile(path string) (fileArgs Arguments) {
 
 	// 解析配置文件
 	if err := json.NewDecoder(file).Decode(&fileArgs); err != nil {
-		fmt.Printf("Error decoding args file: %s\n", err)
+		fmt.Printf("Error decoding config file: %s\n", err)
 	}
 	return
 }
 
-func (a *Arguments) mergeArgs(new *Arguments) {
+func (args *Arguments) mergeArgs(new *Arguments) {
 	// 使用反射遍历结构体，合并参数
-	v := reflect.ValueOf(a).Elem()
+	v := reflect.ValueOf(args).Elem()
+	newArgs := reflect.ValueOf(new).Elem()
 	for i := 0; i < v.NumField(); i++ {
-		// 获取字段名
-		key := v.Type().Field(i).Name
 		// 获取新参数的字段值
-		value := reflect.ValueOf(new).Elem().FieldByName(key)
+		newValue := newArgs.Field(i)
 		// 如果字段值不为空，则更新
-		if value.String() != "" {
-			v.Field(i).Set(value)
+		if newValue.String() != "" {
+			v.Field(i).Set(newValue)
 		}
 	}
 }
 
-func (a *Arguments) printArgs() {
+func (args *Arguments) printArgs() {
 	fmt.Println("Initializing with arguments:")
 	// 使用反射遍历结构体，打印参数
-	v := reflect.ValueOf(a).Elem()
+	v := reflect.ValueOf(args).Elem()
 	for i := 0; i < v.NumField(); i++ {
 		// 获取字段名
 		key := v.Type().Field(i).Name
